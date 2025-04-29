@@ -4,52 +4,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
-  // Function to fetch activities from API
-  async function fetchActivities() {
-    try {
-      const response = await fetch("/activities");
-      const activities = await response.json();
-
-      // Clear loading message
-      activitiesList.innerHTML = "";
-
-      // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
-        const activityCard = document.createElement("div");
-        activityCard.className = "activity-card";
-
-        const spotsLeft = details.max_participants - details.participants.length;
-
-        // Create participants list
-        const participantsList = details.participants.length
-          ? `<ul class="participants-list">${details.participants.map(participant => `<li>${participant}</li>`).join("")}</ul>`
-          : "<p class='no-participants'>No participants yet.</p>";
-
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-          <div class="participants-section">
-            <h5>Participants:</h5>
-            ${participantsList}
-          </div>
-        `;
-
-        activitiesList.appendChild(activityCard);
-
-        // Add option to select dropdown
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        activitySelect.appendChild(option);
-      });
-    } catch (error) {
-      activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
-      console.error("Error fetching activities:", error);
-    }
-  }
-
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -93,3 +47,83 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize app
   fetchActivities();
 });
+
+// Define activitiesList at the top of the script
+const activitiesList = document.getElementById("activities-list");
+
+// Define activitySelect at the top of the script
+const activitySelect = document.getElementById("activity");
+
+// Update fetchActivities to call get_activities endpoint
+async function fetchActivities() {
+  try {
+    const response = await fetch("/activities"); // Call the existing get_activities endpoint
+    const activities = await response.json();
+
+    // Clear loading message
+    activitiesList.innerHTML = "";
+
+    // Populate activities list
+    Object.entries(activities).forEach(([name, details]) => {
+      const activityCard = document.createElement("div");
+      activityCard.className = "activity-card";
+
+      const spotsLeft = details.max_participants - details.participants.length;
+
+      // Create participants list with delete icons
+      const participantsList = details.participants.length
+        ? `<ul class="participants-list">${details.participants
+            .map(
+              (participant) =>
+                `<li>${participant} <button class='delete-btn' onclick="unregisterParticipant('${name}', '${participant}')">❌</button></li>`
+            )
+            .join("")}</ul>`
+        : "<p class='no-participants'>No participants yet.</p>";
+
+      activityCard.innerHTML = `
+        <h4>${name}</h4>
+        <p>${details.description}</p>
+        <p><strong>Schedule:</strong> ${details.schedule}</p>
+        <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+        <div class="participants-section">
+          <h5>Participants:</h5>
+          ${participantsList}
+        </div>
+      `;
+
+      activitiesList.appendChild(activityCard);
+
+      // Add option to select dropdown
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      activitySelect.appendChild(option);
+    });
+  } catch (error) {
+    activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
+    console.error("Error fetching activities:", error);
+  }
+}
+
+// Move unregisterParticipant to the global scope
+async function unregisterParticipant(activityName, email) {
+  try {
+    const response = await fetch(
+      `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+      {
+        method: "POST",
+      }
+    );
+
+    if (response.ok) {
+      alert(`Successfully removed ${email} from ${activityName}`);
+      fetchActivities(); // Refresh the activities list
+    } else {
+      const result = await response.json();
+      alert(result.detail || "An error occurred while unregistering.");
+    }
+  } catch (error) {
+    console.error("Error unregistering participant:", error);
+    alert("Failed to unregister. Please try again.");
+  }
+}
